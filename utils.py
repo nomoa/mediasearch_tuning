@@ -1,9 +1,58 @@
 import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from xgboost import XGBClassifier
+import pandas as pd
 
-from load import load, FEATURE_NAMES
+FEATURE_NAMES = {
+    'MediaSearch_20210127.tsv': [
+        "match_descriptions_plain",
+        "match_descriptions",
+        "match_title",
+        "match_title_plain",
+        "match_category",
+        "match_category_plain",
+        "match_redirect_title",
+        "match_redirect_title_plain",
+        "match_suggest",
+        "match_suggest_plain",
+        "match_aux_text",
+        "match_aux_text_plain",
+        "match_text",
+        "match_text_plain",
+        "match_statements",
+    ],
+    'MediaSearch_20210826.tsv': [
+        "match_descriptions_plain",
+        "match_title_plain",
+        "match_category",
+        "match_redirect_title_plain",
+        "match_suggest",
+        "match_aux_text_plain",
+        "match_text_plain",
+        "match_statements",
+    ]
+}
+
+
+def pairwise_labels(x):
+    return (x + 1) * 2
+
+def pointwise_labels(x):
+    if x == -1:
+        return 0
+    else:
+        return x
+
+
+def load(filename="MediaSearch_20210127.tsv", pairwise=False):
+
+    feat_names = FEATURE_NAMES[filename]
+    with open(filename) as f:
+        headers = ['label', 'qid'] + feat_names + ['image', 'query']
+        dataset = pd.read_csv(f, delimiter='\t',
+                              names=headers)
+
+    ret = dataset.transform({**{'label': pairwise_labels if pairwise else pointwise_labels}, **{n: lambda x: float(x.split(':')[1]) for n in feat_names}})
+    ret.insert(loc=0, column='query_group', value=pd.factorize(dataset['qid'])[0])
+    return ret
 
 
 def plot_grid_search(cv_results, grid_param_1, grid_param_2, name_param_1, name_param_2, title):
@@ -48,35 +97,4 @@ def plot_grid_search(cv_results, grid_param_1, grid_param_2, name_param_1, name_
     ax.legend(loc="best")
     ax.grid('on')
 
-
 dataset = load()
-feats, labels = dataset[FEATURE_NAMES], dataset['label']
-
-num_round = 100
-
-default_params = {
-    'eta': 0.1,  # 0.1 is always better don't search for better params
-    'objective': 'binary:logistic',
-    'eval_metric': 'logloss',
-    'booster': 'gbtree'
-}
-param_grid = {
-    'max_depth': [2, 3, 4, 5, 6],
-    'n_estimators': np.linspace(start=1, stop=100, num=10, dtype=int)
-}
-model = XGBClassifier(objective=default_params['objective'], use_label_encoder=False)
-model.set_params(**default_params)
-
-kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=6)
-grid_search = GridSearchCV(model, param_grid, scoring="neg_log_loss", n_jobs=1, cv=kfold, verbose=1)
-grid_result = grid_search.fit(X=feats, y=labels)
-
-
-
-print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
-
-# Calling Method
-plot_grid_search(grid_result.cv_results_, param_grid['n_estimators'], param_grid['max_depth'],
-                 'n_estimators', 'max_depth', 'nb trees vs max depth')
-plt.show()
-
