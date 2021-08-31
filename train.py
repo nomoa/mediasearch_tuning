@@ -11,7 +11,7 @@ from utils import FEATURE_NAMES, load
 features_version = "MediaSearch_20210826"
 filename = "%s.tsv" % features_version
 dataset = load(filename=filename)
-version = 1
+version = 2
 trees = 34
 depth = 4
 model_name = "%s_xgboost_v%s_%dt_%dd" % (features_version, version, trees, depth)
